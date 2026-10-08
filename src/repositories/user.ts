@@ -1,34 +1,64 @@
 import type { User } from "../domain/user/entity.js";
 import { EmailConflictError, type Repository } from "../domain/user/repository.js";
-import { readJsonFile, updateJsonFile } from "../services/storage/jsonTools.js";
+import { db } from "../prisma/db.js";
+import type { Models } from "../prisma/contract.d.js";
 
-const fileUrl = new URL("../../data/users.json", import.meta.url);
-const emptyUsers: User[] = [];
+type UserRecord = Pick<Models.public_User,
+    "id" | "email" | "username" | "name" | "password" | "createdAt" | "updatedAt">;
+
+function toUser(record: UserRecord): User {
+    return {
+        id: record.id,
+        email: record.email,
+        username: record.username,
+        name: record.name,
+        password: record.password,
+        createdAt: String(record.createdAt),
+        updatedAt: String(record.updatedAt),
+    };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+    return typeof error === "object"
+        && error !== null
+        && "sqlState" in error
+        && error.sqlState === "23505";
+}
 
 export function createUserRepository(): Repository {
     return {
         async getAll() {
-            return readJsonFile(fileUrl, emptyUsers);
+            const records = await db.orm.public.User.all();
+            return records.map(toUser);
         },
 
         async getById(id) {
-            return (await readJsonFile(fileUrl, emptyUsers)).find((user) => user.id === id);
+            const record = await db.orm.public.User.first({ id });
+            return record === null ? undefined : toUser(record);
         },
 
         async getByEmail(email) {
-            return (await readJsonFile(fileUrl, emptyUsers)).find((user) => user.email === email);
+            const record = await db.orm.public.User
+                .where({ email })
+                .first();
+            return record === null ? undefined : toUser(record);
         },
 
         async create(data) {
-            return updateJsonFile(fileUrl, emptyUsers, (users) => {
-                if (users.some((user) => user.email.toLowerCase() === data.email.toLowerCase())) {
+            try {
+                const record = await db.orm.public.User.create({
+                    email: data.email,
+                    username: data.username ?? null,
+                    name: data.name,
+                    password: data.password,
+                });
+                return toUser(record);
+            } catch (error) {
+                if (isUniqueViolation(error)) {
                     throw new EmailConflictError("Email is already registered");
                 }
-
-                const id = users.reduce((largest, user) => Math.max(largest, user.id), 0) + 1;
-                const user: User = { ...data, id, createdAt: new Date().toISOString() };
-                return { data: [...users, user], result: user };
-            });
+                throw error;
+            }
         },
     };
 }

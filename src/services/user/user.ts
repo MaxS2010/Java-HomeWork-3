@@ -3,8 +3,8 @@ import { EmailConflictError } from "../../domain/user/repository.js";
 import { ServiceError } from "../errors.js";
 import type { PublicUser, UserService } from "./types.js";
 
-function toPublicUser(user: { id: number; name: string; email: string; createdAt: string }): PublicUser {
-	return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt };
+function toPublicUser(user: { id: number; name: string; email: string; createdAt: string; updatedAt: string }): PublicUser {
+	return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt, updatedAt: user.updatedAt };
 }
 
 export function createUserService(userRepository: Repository): UserService {

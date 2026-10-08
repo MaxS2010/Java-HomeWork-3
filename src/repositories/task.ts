@@ -1,75 +1,74 @@
-import type {
-    Task,
-} from "../domain/task/entity.js";
+import type { Task } from "../domain/task/entity.js";
+import type { TaskRepository } from "../domain/task/repository.js";
+import type { db } from "../prisma/db.js";
 
-import type {
-    TaskRepository
-} from "../domain/task/repository.js";
-import { readJsonFile, updateJsonFile } from "../services/storage/jsonTools.js";
+type Database = typeof db;
 
-const fileUrl = new URL("../../data/tasks.json", import.meta.url);
-const emptyTasks: Task[] = [];
+function toTask(record: {
+    id: number;
+    userId: number;
+    title: string;
+    description: string;
+    status: Task["status"];
+    priority: Task["priority"];
+    createdAt: unknown;
+    updatedAt: unknown;
+}): Task {
+    return {
+        id: record.id,
+        userId: record.userId,
+        title: record.title,
+        description: record.description,
+        status: record.status,
+        priority: record.priority,
+        createdAt: String(record.createdAt),
+        updatedAt: String(record.updatedAt),
+    };
+}
 
-export function createTaskRepository(): TaskRepository {
+export function createTaskRepository(database: Database): TaskRepository {
     return {
         async getAll(filters) {
-            let tasks = await readJsonFile(fileUrl, emptyTasks);
-
-            if (filters?.userId !== undefined) {
-                tasks = tasks.filter(
-                    (task) => task.userId === filters.userId
-                );
-            }
-
-            if (filters?.status !== undefined) {
-                tasks = tasks.filter(
-                    (task) => task.status === filters.status
-                );
-            }
-
-            if (filters?.priority !== undefined) {
-                tasks = tasks.filter(
-                    (task) => task.priority === filters.priority
-                );
-            }
-
-            return tasks;
+            const where = {
+                ...(filters?.userId === undefined ? {} : { userId: filters.userId }),
+                ...(filters?.status === undefined ? {} : { status: filters.status }),
+                ...(filters?.priority === undefined ? {} : { priority: filters.priority }),
+            };
+            const records = await database.orm.public.Task.where(where).all();
+            return records.map(toTask);
         },
 
         async getById(id) {
-            return (await readJsonFile(fileUrl, emptyTasks)).find((task) => task.id === id);
+            const record = await database.orm.public.Task.first({ id });
+            return record === null ? undefined : toTask(record);
         },
 
         async create(data) {
-            return updateJsonFile(fileUrl, emptyTasks, (tasks) => {
-                const nextId = tasks.reduce((largest, task) => Math.max(largest, task.id), 0) + 1;
-                const now = new Date().toISOString();
-                const task: Task = { ...data, id: nextId, createdAt: now, updatedAt: now };
-                return { data: [...tasks, task], result: task };
+            const record = await database.orm.public.Task.create({
+                userId: data.userId,
+                title: data.title,
+                description: data.description,
+                status: data.status,
+                priority: data.priority,
             });
+            return toTask(record);
         },
 
         async update(id, data) {
-            return updateJsonFile(fileUrl, emptyTasks, (tasks) => {
-                const index = tasks.findIndex((task) => task.id === id);
-                if (index < 0) {
-                    return { data: tasks, result: undefined };
-                }
+            const current = await database.orm.public.Task.first({ id });
+            if (!current) return undefined;
 
-                const existing = tasks[index]!;
-                const updated: Task = { ...existing, ...data, updatedAt: new Date().toISOString() };
-                const nextTasks = [...tasks];
-                nextTasks[index] = updated;
-                return { data: nextTasks, result: updated };
-            });
+            await database.orm.public.Task.where({ id }).update(data);
+            const updated = await database.orm.public.Task.first({ id });
+            return updated === null ? undefined : toTask(updated);
         },
 
         async delete(id) {
-            return updateJsonFile(fileUrl, emptyTasks, (tasks) => {
-                const remaining = tasks.filter((task) => task.id !== id);
-                return { data: remaining, result: remaining.length !== tasks.length };
-            });
+            const current = await database.orm.public.Task.first({ id });
+            if (!current) return false;
+
+            await database.orm.public.Task.where({ id }).delete();
+            return true;
         },
     };
 }
-    

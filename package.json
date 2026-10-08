@@ -6,13 +6,26 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",
-    "test": "npm run build"
+    "test": "npm run build",
+    "contract:emit": "prisma contract emit"
   },
   "keywords": [],
   "type": "module",
   "dependencies": {
+    "@prisma/orm-postgres": "^8.0.0-rc.14",
     "@types/express": "^5.0.6",
+    "dotenv": "^18.0.5",
     "express": "^5.2.1",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "prisma": {
+      "@prisma/orm-toolchain": "8.0.0-rc.14"
+    }
+  },
+  "devDependencies": {
+    "@prisma/cli-engine": "^0.6.2",
+    "@types/node": "^26.6.4",
+    "prisma": "^8.0.0-rc.19"
   }
 }
