@@ -1,3 +1,5 @@
+import type { Temporal } from "temporal-spec";
+
 export interface Task {
     id: number;
     userId: number;
@@ -5,8 +7,8 @@ export interface Task {
     description: string;
     status: TaskStatus;
     priority: TaskPriority;
-    createdAt: string;
-    updatedAt: string;
+    createdAt: Temporal.Instant;
+    updatedAt: Temporal.Instant;
 }
 
 export type TaskStatus = "todo" | "in_progress" | "done";
